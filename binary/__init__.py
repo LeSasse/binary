@@ -64,12 +64,13 @@ def _full_adder(carry_in, a, b):
     )
 
 
-def _subtract_binary(A: list, B: list):
-    return _add_binary(A, B, carry_in=True)
-
-
 def _invert(A: list):
     return [not a for a in A]
+
+
+def _subtract_binary(A: list, B: list):
+    B = _get_twos_complement(B)
+    return _add_binary(A, B, carry_in=True)
 
 
 def _get_twos_complement(A: list):
