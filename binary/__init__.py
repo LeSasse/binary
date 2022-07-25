@@ -1,4 +1,3 @@
-import numpy as np
 
 from .utils import (
     _str_to_bools, _bools_to_str, _check_all_bool, _check_binary_str,
