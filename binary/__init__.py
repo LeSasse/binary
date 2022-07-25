@@ -1,82 +1,9 @@
 import numpy as np
 
-
-def _str_to_bools(n: str):
-    return [bool(int(x)) for x in n]
-
-
-def _bools_to_str(n: list):
-    return "".join([str(int(x)) for x in _check_all_bool(n)])
-
-
-def _check_all_bool(n: list):
-    for x in n:
-        assert isinstance(x, bool), (
-            "Binary arrays must only consist of"
-            " boolean type"
-        )
-    return n
-
-
-def _check_binary_str(n: str):
-    for x in n:
-        assert x in ["0", "1"], "string not binary representation"
-    return n
-
-
-def _xor(a: bool, b: bool):
-    """ xor logical operator """
-
-    assert isinstance(a, bool), "input to _xor must be boolean"
-    assert isinstance(b, bool), "input to _xor must be boolean"
-    return (a or b) and not (a and b)
-
-
-def _add_binary(A: list, B: list, carry_in=False):
-    A_rev = A[::-1]
-    B_rev = B[::-1]
-    result = []
-    for a, b in zip(A_rev, B_rev):
-        _sum, carry_in = _full_adder(carry_in, a, b)
-        result.append(_sum)
-
-    if carry_in:
-        result.append(carry_in)
-
-    return result[::-1]
-
-
-def _half_adder(a, b):
-    _check_all_bool([a, b])
-    return _xor(a, b), a and b
-
-
-def _full_adder(carry_in, a, b):
-    _check_all_bool([a, b])
-
-    sum_out_halfadder_1, carry_out_halfadder_1 = _half_adder(a, b)
-    sum_out_halfadder_2, carry_out_halfadder_2 = _half_adder(
-        carry_in, sum_out_halfadder_1
-    )
-    return (
-        sum_out_halfadder_2,
-        carry_out_halfadder_2 or carry_out_halfadder_1
-    )
-
-
-def _invert(A: list):
-    return [not a for a in A]
-
-
-def _subtract_binary(A: list, B: list):
-    B = _get_twos_complement(B)
-    return _add_binary(A, B, carry_in=True)
-
-
-def _get_twos_complement(A: list):
-    A = _invert(A)
-    add_one_ = [False for x in range(len(A) - 1)] + [True]
-    return _add_binary(A, add_one_)
+from .utils import (
+    _str_to_bools, _bools_to_str, _check_all_bool, _check_binary_str,
+    _add_binary, _subtract_binary, _get_twos_complement
+)
 
 
 class BinarySequence:
@@ -245,6 +172,49 @@ class BinarySequence:
             f"signed={self.signed}, verbosity={self.verbosity})"
         )
 
+    def __eq__(self, other):
+        
+        if (self.signed != other.signed) or (self.n_bits != other.n_bits):
+            return False
+        
+        for i, j in zip(self._booleans, other._booleans):
+            if not i == j:
+                return False
+
+        return True
+
+    def __gt__(self, other):
+        assert (
+            self.signed == other.signed
+        ) or (self.n_bits == other.n_bits), ( 
+            "Can't compare as one is signed but not the other "
+            "or number of bits isn't the same"
+        )
+        if self.signed:
+            if other._booleans[0] and not self._booleans[0]:
+                return True
+            if self._booleans[0] and not other._booleans[0]:
+                return False
+
+            for i, j in zip(self._booleans, other._booleans):
+                if i > j:
+                    return True
+            return False
+
+        for i, j in zip(self._booleans, other._booleans):
+            if i > j:
+                return True
+
+    def __lt__(self, other):
+        assert (
+            self.signed == other.signed
+        ) or (self.n_bits == other.n_bits), (
+            "Can't compare as one is signed but not the other "
+            "or number of bits isn't the same"
+        )
+        return not (self > other) and not (self == other)
+
+
     def __add__(self, other_sequence):
 
         assert self.signed == other_sequence.signed
@@ -288,168 +258,47 @@ For binary sequences ({x}) of {self.n_bits} bits:
     def __int__(self):
         return self._decimal
 
-#############################################################################
-# tests
-
-
-str_binaries_unsigned = {
-    "10100010": (162, [True, False, True, False, False, False, True, False]),
-    "01011101": (93, [False, True, False, True, True, True, False, True]),
-    "11111111": (255, [True for x in range(8)]),
-    "00000000": (0, [False for x in range(8)]),
-    "01110101": (117, [False, True, True, True, False, True, False, True]),
-    "01001000": (72, [False, True, False, False, True, False, False, False]),
-}
-
-
-str_binaries_signed = {
-    "10000000": (-128, [True] + [False for x in range(7)]),
-    "10000001": (-127, [True] + [False for x in range(6)] + [True]),
-    "10000010": (-126, [
-        True, False, False, False, False, False, True, False
-    ]),
-    "00000000": (0, [False for x in range(8)]),
-    "01111110": (126, [False] + [True for x in range(6)] + [False]),
-    "01111101": (125, [False] + [True for x in range(5)] + [False, True]),
-}
-
-
-def test_str_sequences():
-
-    for str_seq, (int_repr, bools) in str_binaries_unsigned.items():
-
-        a = BinarySequence(sequence=str_seq)
-        assert a._decimal == int_repr, (
-            f"Decimal representation incorrect for {str_seq}"
-        )
-        for i, j in zip(a._booleans, bools):
-            assert i == j, (
-                f"boolean representation incorrect for {str_seq}"
+    def __sub__(self, other_sequence):
+        
+        assert self.signed == other_sequence.signed
+        assert self.n_bits == other_sequence.n_bits
+        if not self.signed:
+            assert self > other_sequence, (
+                "For subtraction of unsigned numbers the minuend must be "
+                "greater than the subtrahend"
             )
-
-
-def test_bool_sequences():
-
-    for str_seq, (int_repr, bools) in str_binaries_unsigned.items():
-
-        a = BinarySequence(sequence=bools)
-        assert a._decimal == int_repr, (
-            f"Decimal representation incorrect for {str_seq}"
-        )
-        assert str_seq == a._str, (
-            f"String representation incorrect for {str_seq}"
-        )
-
-
-def test_dec_sequences():
-
-    for str_seq, (int_repr, bools) in str_binaries_unsigned.items():
-        a = BinarySequence(sequence=int_repr)
-        assert a._decimal == int_repr, (
-            f"Decimal representation incorrect for {str_seq}"
-        )
-        assert str_seq == a._str, (
-            f"String representation incorrect for {str_seq}"
-        )
-        for i, j in zip(a._booleans, bools):
-            assert i == j, (
-                f"boolean representation incorrect for {str_seq}"
-            )
-
-
-def test_unsigned_addition():
-
-    a = np.random.randint(low=0, high=100, size=100)
-    b = np.random.randint(low=0, high=100, size=100)
-    for x, y in zip(a, b):
-        x = int(x)
-        y = int(y)
-        bin_x = BinarySequence(x, n_bits=8, signed=False, verbosity=2)
-        bin_y = BinarySequence(y, n_bits=8, signed=False, verbosity=2)
-
-        assert (bin_x + bin_y)._decimal == x + y, (
-            "Problem with addition"
-        )
-        assert int(bin_x) == x, "Problem with int conversion"
-
-
-def test_signed():
-
-    for str_seq, (int_repr, bools) in str_binaries_signed.items():
-        a = BinarySequence(sequence=int_repr, signed=True)
-        assert a._decimal == int_repr, (
-            f"Decimal representation incorrect for {str_seq}"
-        )
-        assert str_seq == a._str, (
-            f"String representation incorrect for {str_seq}"
-        )
-        for i, j in zip(a._booleans, bools):
-            assert i == j, (
-                f"boolean representation incorrect for {str_seq}"
-            )
-
-
-def test_add_signed():
-
-    a = np.random.randint(low=-30, high=30, size=100)
-    b = np.random.randint(low=-30, high=30, size=100)
-    for x, y in zip(a, b):
-        x = int(x)
-        y = int(y)
-        bin_x = BinarySequence(x, signed=True, verbosity=2)
-        bin_y = BinarySequence(y, signed=True, verbosity=2)
-
-        assert (bin_x + bin_y)._decimal == x + y, (
-            f"Problem with addition {x} + {y} = {x+y}\n"
-            f"{bin_x._decimal}\n"
-            f"{bin_y._decimal}\n"
-            f"  {bin_x}\n"
-            f"+ {bin_y}\n"
-            f"= {bin_x + bin_y}\n"
-            f"{(bin_x + bin_y)._decimal}"
+        
+        res = _subtract_binary(self._booleans, other_sequence._booleans)
+        if self.signed and (len(res) > len(self._booleans)):
+            res = res[-self.n_bits:]
+            """
+            if self._booleans[0] == other_sequence._booleans[0]:
+                assert self._booleans[0] == res[0], (
+                    f"was {self._decimal} + {other_sequence._decimal}"
+                )
+            """
+        elif len(res) > len(self._booleans):
+            res = res[-self.n_bits:]
+       
+        BS_res = BinarySequence(
+            res,
+            signed=self.signed,
+            n_bits=len(res)
         )
 
-        assert int(bin_x) == x, "Problem with int conversion"
+        x = "signed" if self.signed else "unsigned"
+        if self.verbosity > 1:
 
+            print(f"""
 
-def test_unsigned_16bit():
+For binary sequences ({x}) of {self.n_bits} bits:
 
-    a = np.random.randint(low=0, high=4000, size=100)
-    b = np.random.randint(low=0, high=4000, size=100)
-    for x, y in zip(a, b):
-        x = int(x)
-        y = int(y)
-        bin_x = BinarySequence(x, n_bits=16, signed=False, verbosity=2)
-        bin_y = BinarySequence(y, n_bits=16, signed=False, verbosity=2)
-        assert (bin_x + bin_y)._decimal == x + y, (
-            "Problem with addition"
-        )
+            {self}
+        -   {other_sequence}
+            ----------------
+        =   {BS_res}
 
-        assert int(bin_x) == x, "Problem with int conversion"
+        ({self._decimal} - {other_sequence._decimal} = {BS_res._decimal})
+""")
+        return BS_res
 
-
-def test_signed_16bit():
-
-    a = np.random.randint(low=-2769, high=2768, size=100)
-    b = np.random.randint(low=-2769, high=2768, size=100)
-    for x, y in zip(a, b):
-        x = int(x)
-        y = int(y)
-        bin_x = BinarySequence(x, n_bits=16, signed=True, verbosity=2)
-        bin_y = BinarySequence(y, n_bits=16, signed=True, verbosity=2)
-
-        assert (bin_x + bin_y)._decimal == x + y, (
-            "Problem with addition"
-        )
-
-        assert int(bin_x) == x, "Problem with int conversion"
-
-
-if __name__ == "__main__":
-    test_str_sequences()
-    test_bool_sequences()
-    test_unsigned_addition()
-    test_signed()
-    test_add_signed()
-    test_unsigned_16bit()
-    test_signed_16bit()
