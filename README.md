@@ -12,14 +12,6 @@ source /path/to/venv/bin/activate
 pip install -U pip
 
 ```
-
-For testing or development you should also install the dev-requirements.
-
-```sh
-pip install -r dev-requirements.txt
-
-```
-
 Then go to the location where you want to install the package and:
 
 ```sh
@@ -27,6 +19,13 @@ Then go to the location where you want to install the package and:
 git clone https://github.com/LeSasse/binary.git
 cd binary
 pip install -e .
+
+```
+
+For testing or development you should also install the dev-requirements.
+
+```sh
+pip install -r dev-requirements.txt
 
 ```
 
